@@ -43,14 +43,15 @@ Merged from both source documents; overlapping ideas combined into one item.
 
 ### High priority
 
-- [ ] **Pattern chaining / pipelines** — send one pattern's output as the next pattern's input (e.g.
-  `extract_wisdom` → `write_essay`). Originally surfaced in `fabric-gui` when "Session" was mistaken for
-  this exact feature. The CLI already supports it trivially via piping
-  (`fabric-ai -p pattern1 | fabric-ai -p pattern2`, since fabric-ai behaves as a standard Unix filter);
-  no UI has ever exposed it as a guided flow. Not something fabric-ai's API does natively — this is
-  GUI-side orchestration (two sequential `/chat` calls). A visual pipeline/wiring builder (drag boxes,
-  connect outputs to inputs) is the ambitious version; a simple "run again with this pattern" button using
-  the last output as input is the minimal version — start there.
+- [x] **Pattern chaining / pipelines (minimal version)** — 2026-09-14. "Use as input →" button loads the
+  current output into the input box, clears the YouTube field, and focuses pattern search so the user
+  picks a new pattern and Runs — no manual copy/paste. Verified live: `tighten_prompt`'s output correctly
+  fed `improve_prompt` as input. Originally surfaced in `fabric-gui` when "Session" was mistaken for this
+  exact feature. Not something fabric-ai's API does natively (the CLI equivalent is piping,
+  `fabric-ai -p pattern1 | fabric-ai -p pattern2`) — this is GUI-side orchestration, two sequential
+  `/chat` calls with a UI step in between.
+  - [ ] **Ambitious version, not built**: a full visual pipeline/wiring builder (drag boxes, connect
+    outputs to inputs, run a whole chain in one click). Revisit if the minimal version proves limiting.
 - [ ] **Pattern variables** — patterns can define `{{variable}}` placeholders; `/patterns/:name/apply`
   already accepts a `variables` map server-side, but no UI exists to supply them. The official fabric web
   app has a raw JSON textarea for this (`{"lang_code": "fr", "role": "expert"}`) — functional but not
