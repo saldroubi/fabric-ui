@@ -42,6 +42,8 @@
 	let usageText = $state('');
 	let cliCommand = $state('—');
 	let running = $state(false);
+	let hasOutput = $derived(output.trim().length > 0);
+	let patternSearchEl = $state<HTMLInputElement | undefined>();
 
 	let filteredPatterns = $derived.by(() => {
 		const q = patternQuery.trim().toLowerCase();
@@ -218,6 +220,23 @@
 		navigator.clipboard.writeText(output);
 		setStatus('Copied to clipboard.', 'success');
 	}
+
+	// Pattern chaining, minimal version: load this run's output as the next
+	// run's input, so the user just picks a new pattern and hits Run — instead
+	// of manually copying output, clearing input, pasting, and switching
+	// patterns by hand. A full visual pipeline builder is a later step.
+	function chainOutput() {
+		if (!hasOutput) return;
+		inputText = output.trim();
+		youtubeUrl = '';
+		output = '';
+		usageText = '';
+		cliCommand = '—';
+		setStatus('Loaded previous output as input — pick a new pattern and Run.', 'idle');
+		patternSearchEl?.focus();
+		patternSearchEl?.select();
+		patternSearchEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}
 </script>
 
 <svelte:head>
@@ -251,6 +270,7 @@
 					>
 					<input
 						id="patternSearch"
+						bind:this={patternSearchEl}
 						autocomplete="off"
 						placeholder={patternsFailedToLoad ? 'failed to load — is fabric-ai --serve running?' : 'Search patterns…'}
 						bind:value={patternQuery}
@@ -367,6 +387,14 @@
 					class="rounded-[9px] border border-zinc-300 px-4.5 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-50 dark:hover:bg-zinc-800"
 				>
 					Copy output
+				</button>
+				<button
+					onclick={chainOutput}
+					disabled={!hasOutput}
+					title="Load this output as the input for a new pattern run"
+					class="rounded-[9px] border border-emerald-300 px-4.5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+				>
+					Use as input →
 				</button>
 				<span
 					class="min-h-[1.1rem] text-sm font-medium {statusKind === 'success'
