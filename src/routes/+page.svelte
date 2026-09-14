@@ -77,7 +77,8 @@
 	async function loadPatterns() {
 		try {
 			allPatterns = await fetchPatternNames();
-			await selectPattern(allPatterns.includes('tighten_prompt') ? 'tighten_prompt' : (allPatterns[0] ?? ''));
+			// deliberately no default selection — the search box's placeholder
+			// shows an example instead, and the user picks explicitly.
 		} catch {
 			patternsFailedToLoad = true;
 		}
@@ -330,7 +331,9 @@
 							id="patternSearch"
 							bind:this={patternSearchEl}
 							autocomplete="off"
-							placeholder={patternsFailedToLoad ? 'failed to load — is fabric-ai --serve running?' : 'Search patterns…'}
+							placeholder={patternsFailedToLoad
+							? 'failed to load — is fabric-ai --serve running?'
+							: 'e.g. tighten_prompt, extract_wisdom, summarize…'}
 							bind:value={patternQuery}
 							oninput={openDropdown}
 							onfocus={openDropdown}
