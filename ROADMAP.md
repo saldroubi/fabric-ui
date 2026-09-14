@@ -9,7 +9,7 @@ doc for this project.
 `fabric-gui` (a vanilla HTML/JS + Python-proxy tool) was the first prototype — built to run fabric-ai
 patterns from a browser instead of the CLI. It proved out the core feature set and caught real problems
 (unsearchable 260+-pattern list, silent YouTube/input conflicts, sessions not doing what the name implied)
-before this rewrite started. `fabric-ui-advanced` is a clean SvelteKit rebuild — not a fork of `fabric-gui`
+before this rewrite started. `fabric-ui` is a clean SvelteKit rebuild — not a fork of `fabric-gui`
 and not a fork of fabric's own official `web/` app — that carries the *proven features* forward properly
 architected, and adds the larger ones `fabric-gui` never attempted.
 
@@ -94,7 +94,7 @@ Merged from both source documents; overlapping ideas combined into one item.
 ## Shipped
 
 Everything below was built and verified working in `fabric-gui` (the vanilla-JS prototype). The features
-carry forward into `fabric-ui-advanced` as native SvelteKit implementations rather than ported files —
+carry forward into `fabric-ui` as native SvelteKit implementations rather than ported files —
 tracked here as design/functionality wins, not code to copy.
 
 - Token usage display (parses the `/chat` SSE `usage` event) — 2026-09-11
@@ -118,7 +118,7 @@ tracked here as design/functionality wins, not code to copy.
   all 2026-09-11, all tested live with planted-issue inputs to confirm correctness, not just that they run.
   These live in `~/.config/fabric/patterns/` and work regardless of which UI is used.
 
-**`fabric-ui-advanced` milestones:**
+**`fabric-ui` milestones:**
 
 - SvelteKit + TypeScript + Tailwind 4 + mdsvex scaffold, git-initialized — 2026-09-14
 - Server-side proxy (`/api/fabric/[...path]`) replacing the standalone Python proxy — 2026-09-14

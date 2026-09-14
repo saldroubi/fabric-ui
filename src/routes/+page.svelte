@@ -498,6 +498,6 @@
 			</section>
 		</div>
 
-		<p class="text-center text-xs text-zinc-400 dark:text-zinc-600">fabric-ui-advanced — a local, open rebuild</p>
+		<p class="text-center text-xs text-zinc-400 dark:text-zinc-600">fabric-ui — a local, open rebuild</p>
 	</main>
 </div>

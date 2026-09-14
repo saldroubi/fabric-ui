@@ -15,7 +15,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-npx sv@0.17.0 create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" mdsvex --no-download-check --install npm fabric-ui-advanced
+npx sv@0.17.0 create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" mdsvex --no-download-check --install npm fabric-ui
 ```
 
 ## Developing
