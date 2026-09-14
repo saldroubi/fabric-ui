@@ -1,3 +1,8 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* Manual dark-mode toggle: `dark:` classes respond to a `.dark` class on
+   <html> (set in +page.svelte, initialized from localStorage / system
+   preference) instead of only ever following the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
