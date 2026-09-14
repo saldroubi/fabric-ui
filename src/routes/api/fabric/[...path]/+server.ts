@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 
 // Same-origin proxy to fabric-ai --serve. fabric-ai's REST API only sets
@@ -7,7 +8,10 @@ import type { RequestHandler } from './$types';
 // calling it directly would have those requests silently blocked. Running
 // server-side here sidesteps CORS entirely: this is a server-to-server
 // call, not a browser cross-origin request.
-const BACKEND = 'http://127.0.0.1:8080';
+//
+// Configurable via FABRIC_AI_URL (see .env.example) for anyone running
+// `fabric-ai --serve` on a different host/port than the default.
+const BACKEND = env.FABRIC_AI_URL || 'http://127.0.0.1:8080';
 
 const proxy: RequestHandler = async ({ params, request, url }) => {
 	const targetUrl = `${BACKEND}/${params.path}${url.search}`;
