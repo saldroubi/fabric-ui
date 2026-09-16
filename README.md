@@ -19,7 +19,10 @@ See [`ROADMAP.md`](./ROADMAP.md) for what's shipped and what's next.
 
 ## Prerequisites
 
-- [`fabric-ai`](https://github.com/danielmiessler/fabric) installed (`brew install fabric-ai`, or see fabric's own install docs) and configured with at least one model vendor's API key
+- [`fabric-ai`](https://github.com/danielmiessler/fabric) installed and configured with at least one model vendor's API key. fabric-ai itself runs on macOS, Windows, and Linux — pick whichever matches your OS, or see [fabric's own install docs](https://github.com/danielmiessler/fabric#installation) for other options (manual binary download, `go install`, etc.):
+  - macOS: `brew install fabric-ai`
+  - Windows: `winget install danielmiessler.Fabric` (or `scoop install fabric-ai`)
+  - Linux: see fabric's install docs linked above
 - Node.js 20+ and npm
 - `fabric-ai --serve` running (defaults to `http://127.0.0.1:8080`) — **this app is a frontend for that server, not a replacement for it**
 

@@ -52,11 +52,28 @@ Merged from both source documents; overlapping ideas combined into one item.
   `/chat` calls with a UI step in between.
   - [ ] **Ambitious version, not built**: a full visual pipeline/wiring builder (drag boxes, connect
     outputs to inputs, run a whole chain in one click). Revisit if the minimal version proves limiting.
-- [ ] **Pattern variables** — patterns can define `{{variable}}` placeholders; `/patterns/:name/apply`
-  already accepts a `variables` map server-side, but no UI exists to supply them. The official fabric web
-  app has a raw JSON textarea for this (`{"lang_code": "fr", "role": "expert"}`) — functional but not
-  friendly. Worth doing better: a form UI that surfaces the variables a *specific* pattern actually
-  declares, not a blind JSON box.
+- [x] **Pattern variables** — 2026-09-15. Picking a pattern now scans its raw `system.md` for `{{name}}`
+  placeholders (skipping the built-in `{{input}}`) and shows one labeled field per variable, with a snippet
+  of the surrounding prose as a hint. Run is blocked with a specific error until every declared variable is
+  filled in; values flow through to `/chat`'s existing `variables` map and are mirrored in the CLI-command
+  preview as `-v=name:value`. Verified live against `translate` (`{{lang_code}}`) — correctly translated to
+  French. Note: fabric-ai attaches no type/description/allowed-values metadata to variables (confirmed by
+  reading `internal/plugins/template/template.go` — it's a bare `variables[name]` string lookup), so there's
+  no dropdown, just a free-text field per variable — that's the ceiling of what the data supports.
+- [x] **Prompt preview (client-side dry-run)** — 2026-09-15. fabric-ai's real `--dry-run` fully resolves a
+  pattern (variables + `{{input}}`) and returns the exact request it would have sent, without calling a real
+  model or spending tokens — but it's CLI-only: `internal/server/chat.go`'s `/chat` handler hardcodes
+  `dryRun: false`, so the REST API fabric-ui talks to has no way to request it. Built a client-side
+  equivalent instead: "Preview prompt" (next to Run) fetches the pattern's raw `system.md` and reproduces
+  fsdb's `applyVariables`/`ensureInput` logic locally — substituting filled-in variables and `{{input}}`
+  (auto-appended if the pattern doesn't reference it, matching server behavior), leaving anything unfilled
+  as a visible `{{name}}` placeholder. Shown in a dismissible violet panel labeled "not sent, no tokens
+  used," separate from the real Output panel so it can't be mistaken for a real run. Verified live against
+  `translate`: correctly showed `{{lang_code}}` unresolved before filling it in, then `fr` after.
+  - **Follow-up found 2026-09-15**: `POST /patterns/:name/apply` (`internal/server/patterns.go:106`) is a
+    real server-side equivalent of this same resolution. Switching Preview to call it instead of the
+    hand-rolled client-side substitution would make it 100% accurate — including surfacing the exact
+    "missing variable" error `/chat` would give — for near-zero extra effort. Not done yet.
 - [ ] **Contexts** — `/contexts/*` supports reusable text blocks prepended to any pattern (e.g. a saved
   Genie Agent's vocabulary, so `improve_genie_question` doesn't have to guess table/column names every
   time). Not exposed in either the old or new UI yet.
@@ -69,8 +86,53 @@ Merged from both source documents; overlapping ideas combined into one item.
     a pattern currently fails against Anthropic (`400 This model does not support assistant message
     prefill`), reproduced via plain CLI — this is an upstream fabric-ai bug, not something either UI can
     fix. Tracked as [danielmiessler/fabric#2208](https://github.com/danielmiessler/fabric/issues/2208).
+- [ ] **Reasoning/"thinking" level control** — attempted and reverted 2026-09-15; **blocked on an upstream
+  fabric-ai server bug, do not re-attempt without a fabric-ai fix or a real root cause.**
+  - Why it looked promising: `internal/server/chat.go` passes `request.Thinking` straight into
+    `ChatOptions` — genuinely wired into `/chat`, unlike most other CLI-only flags checked in the same
+    audit (image gen, TTS, transcription, notifications, max-tokens, suppress-think — all confirmed
+    dropped by the handler, no REST path exists).
+  - Built: a dropdown (Off/Low/Medium/High) next to Model, plus a client-side fix forcing
+    `temperature: 1` whenever thinking is non-off — required because Anthropic 400s any thinking-enabled
+    request unless temperature is exactly 1 (verified via plain CLI repro), and fabric-ai never
+    coordinates the two itself despite `--raw`'s flag text claiming "smart parameter selection" for
+    Anthropic (no such logic actually exists in the plugin, confirmed by reading it).
+  - **Found while testing, not initially expected**: even with temperature correctly forced to 1, every
+    non-default thinking level (`low`/`medium`/`high` — not just `high`) fails when the request goes
+    through fabric-ai's REST `/chat` endpoint, returning a generic `empty response` error
+    (`chatter_error_empty_response` in `internal/core/chatter.go:185`, meaning the accumulated stream
+    content was empty but no stream error was recorded). The **identical** request (same model, same
+    `--thinking` level, same `--temperature 1`) succeeds via plain CLI, including with `--stream`
+    explicitly enabled — so it isn't a non-streaming-vs-streaming difference, and both code paths call the
+    same `chatter.Send`/`SendStream` functions. Restarting `fabric-ai --serve` (to rule out stale
+    in-process state) made no difference. Root cause not identified — most likely a bug specific to the
+    REST server's SSE handling in `internal/server/chat.go` (e.g. around the `clientGone`/`streamChan`
+    plumbing) when Anthropic's extended-thinking response has a longer pre-content delay than usual, but
+    this is a hypothesis, not confirmed.
+  - Net effect: the dropdown as built only had one working option ("(default)" — i.e., not sending
+    `thinking` at all), so it was removed from the UI rather than shipped half-functional. The underlying
+    client library support (`ChatRunOptions.thinking`, `THINKING_LEVELS`, the temperature-1 coupling fix)
+    was left in place in `src/lib/fabric.ts`, unused by the UI, so re-adding the control later is cheap
+    once fabric-ai's server-side bug is understood or fixed — don't rediscover the temperature coupling,
+    just re-verify the empty-response bug is actually resolved before re-wiring the dropdown.
+  - Not filed upstream yet — should be, with the exact repro above (`-p translate -v=lang_code:fr
+    --thinking low --temperature 1`, CLI succeeds / REST `/chat` with identical params returns empty
+    response).
+- [ ] **`fabric-ai --serve` behind an API key** — 2026-09-15, found via the same audit. Confirmed in
+  `internal/server/auth.go`: `requireAPIKeyForBind` forces `--api-key` whenever `--serve` binds to
+  anything non-loopback (a real documented setup, e.g. running fabric-ai on a home server), and
+  `APIKeyMiddleware` then 401s every request without a matching `X-API-Key` header. fabric-ui's proxy
+  (`src/routes/api/fabric/[...path]/+server.ts`) has no concept of this — no env var, nothing — so
+  pointing fabric-ui at any non-localhost fabric-ai instance currently fails silently and totally. This is
+  a reliability gap more than a feature request; fix is one env var forwarded as a header in the proxy.
 
 ### Medium priority
+
+- [ ] **Vendor/API-key setup panel** — 2026-09-15, found via the same audit. `GET /config` (returns each
+  vendor's key masked to last 4 chars) and `POST /config/update` (writes `.env`, skips resubmitted masked
+  values) already exist server-side and are already built defensively. Today, adding a new model vendor
+  means hand-editing `~/.config/fabric/.env` or running the CLI's interactive `--setup` — a panel showing
+  configured vendors and accepting a new key would remove the last reason to touch a terminal for setup.
 
 - [ ] **Multi-model comparison view** — run the same pattern across 2-3 models (e.g. different Claude
   tiers, or Ollama if configured) side by side to compare outputs directly.
@@ -82,8 +144,27 @@ Merged from both source documents; overlapping ideas combined into one item.
   drag-and-drop file input, so users don't need to remember which flag maps to which input type.
 - [ ] **Strategies dropdown** — `/strategies` lists reasoning strategies (e.g. chain-of-thought) from
   `~/.config/fabric/strategies/*.json`. Not exposed anywhere yet.
-- [ ] **Advanced params panel** — temperature / top_p / seed are supported by fabric-ai's `ChatOptions` but
-  hardcoded to defaults currently.
+- [x] **Advanced params panel** — 2026-09-16. Collapsible panel under Model with sliders for temperature,
+  top-p, presence penalty, and frequency penalty. Values are only put on the wire when changed from
+  fabric-ai's own CLI defaults (0.7 / 0.9 / 0.0 / 0.0 per `internal/cli/flags.go`), so an untouched panel
+  leaves request bodies byte-identical to before the feature existed; a "modified" badge and a
+  reset-to-defaults button make the non-default state obvious. Non-default values also show up in the
+  CLI-command preview (`-t` / `-T` / `-P` / `-F`). Verified live: temperature 1.4 reached the model,
+  preview correctly rendered `-t 1.4` while omitting the untouched three, and reset restored everything.
+  - Vendor support is uneven, and the panel says so inline rather than pretending otherwise — confirmed by
+    reading each plugin: **Anthropic** treats Temperature and TopP as mutually exclusive (a non-default
+    TopP makes `anthropic.go` send TopP and drop Temperature entirely) and never references either
+    penalty; **Gemini** applies Temperature/TopP but ignores the penalties too; **OpenAI** is the only
+    vendor where all four do something. Crucially, none of them *reject* these values — unlike the
+    thinking control's hard 400 — so this was safe to ship where that wasn't.
+  - Corrected 2026-09-15: this bullet previously also listed `seed`, but the full-surface audit confirmed
+    `chat.go`'s handler only copies 9 specific fields from the request into `ChatOptions`
+    (Model/Temperature/TopP/FrequencyPenalty/PresencePenalty/Thinking/Search/SearchLocation/Quiet) and
+    silently drops everything else — `seed` has no REST path, CLI-only, so it was left out of the panel.
+  - Possible follow-up: fabric-ui's "Preview prompt" still shows only the resolved system message, while
+    the CLI's real `--dry-run` also prints the options block (Model/Temperature/TopP/penalties). Now that
+    these values are user-controllable, appending a similar options summary to the preview would close
+    most of the remaining gap between the two.
 
 ### Lower priority / exploratory
 
