@@ -51,9 +51,10 @@ In one terminal:
 fabric-ai --serve
 ```
 
-In another:
+In another — **from the `fabric-ui` folder** (a new terminal window starts in your home directory, not wherever you cloned to, so `cd` there first):
 
 ```sh
+cd fabric-ui   # or wherever you cloned it
 npm run dev
 # or, to pick a specific port (e.g. if 5173 is already in use by something else):
 npm run dev -- --port 5180 --strictPort
