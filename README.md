@@ -51,7 +51,7 @@ In one terminal:
 fabric-ai --serve
 ```
 
-In another — **from the `fabric-ui` folder** (a new terminal window starts in your home directory, not wherever you cloned to, so `cd` there first):
+In another terminal, from inside `fabric-ui`:
 
 ```sh
 cd fabric-ui   # or wherever you cloned it
