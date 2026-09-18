@@ -2,7 +2,7 @@
 
 A local web interface for [fabric-ai](https://github.com/danielmiessler/fabric) patterns — search, run, and inspect output without the CLI, and without fabric's own official web app's limitations.
 
-**Not affiliated with or endorsed by the fabric project.** Personal project, currently private.
+**Not affiliated with or endorsed by the fabric project.** Personal project.
 
 ## Why this exists
 
@@ -76,3 +76,11 @@ An [adapter](https://svelte.dev/docs/kit/adapters) may be needed depending on wh
 ## Tech stack
 
 SvelteKit 5 (runes mode) + TypeScript + Tailwind 4 + mdsvex — chosen to match fabric's own official web app's core stack, in case components/patterns are worth borrowing later.
+
+## Contributing
+
+Issues and PRs welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+## License
+
+[MIT](./LICENSE)

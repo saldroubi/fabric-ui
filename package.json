@@ -2,6 +2,13 @@
 	"name": "fabric-ui",
 	"private": true,
 	"version": "0.0.1",
+	"description": "A local web interface for fabric-ai patterns — search, run, and inspect output without the CLI.",
+	"license": "MIT",
+	"author": "Samer Al-Droubi",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/saldroubi/fabric-ui.git"
+	},
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
