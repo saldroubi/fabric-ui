@@ -60,6 +60,8 @@ npm run dev
 npm run dev -- --port 5180 --strictPort
 ```
 
+**Or, one terminal instead of two:** `npm run dev:all` starts `fabric-ai --serve` and the dev server together, with labeled/colored output so you can still tell them apart, and a single `Ctrl+C` stops both. Trade-off: the two processes' output is interleaved into one stream instead of each getting its own clean terminal, and you can't restart just one without restarting both — if that matters, use the two-terminal version above instead.
+
 Open the URL Vite prints (defaults to `http://localhost:5173`). The port you choose doesn't matter for functionality — all fabric-ai API calls are proxied server-side through this app's own backend routes (`src/routes/api/`), so there's no CORS dependency on which port you land on.
 
 ## Building
