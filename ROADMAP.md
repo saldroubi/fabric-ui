@@ -10,7 +10,7 @@ doc for this project.
 patterns from a browser instead of the CLI. It proved out the core feature set and caught real problems
 (unsearchable 260+-pattern list, silent YouTube/input conflicts, sessions not doing what the name implied)
 before this rewrite started. `fabric-ui` is a clean SvelteKit rebuild — not a fork of `fabric-gui`
-and not a fork of fabric's own official `web/` app — that carries the *proven features* forward properly
+and not a fork of fabric's own official `web/` app — that carries the _proven features_ forward properly
 architected, and adds the larger ones `fabric-gui` never attempted.
 
 ## Decisions
@@ -19,7 +19,7 @@ architected, and adds the larger ones `fabric-gui` never attempted.
   the TUI's "core logic"). Reconsidered 2026-09-14: the two aren't code-shareable anyway (different
   language runtimes — Go binary vs. browser/Node JS), and personal usefulness matters more here than
   matching fabric's own Go-binary distribution model. If a TUI happens later, it will be a separate,
-  from-scratch Go project that only shares *API/protocol knowledge* with this one, not code. If real
+  from-scratch Go project that only shares _API/protocol knowledge_ with this one, not code. If real
   logic-sharing across a future TUI and this web app ever matters, the right place for that shared logic
   is inside `fabric-ai` itself (already Go) as new endpoints/flags — both frontends would then be thin
   clients over one implementation.
@@ -44,50 +44,50 @@ Merged from both source documents; overlapping ideas combined into one item.
 ### High priority
 
 - [x] **Pattern chaining / pipelines (minimal version)** — 2026-09-14. "Use as input →" button loads the
-  current output into the input box, clears the YouTube field, and focuses pattern search so the user
-  picks a new pattern and Runs — no manual copy/paste. Verified live: `tighten_prompt`'s output correctly
-  fed `improve_prompt` as input. Originally surfaced in `fabric-gui` when "Session" was mistaken for this
-  exact feature. Not something fabric-ai's API does natively (the CLI equivalent is piping,
-  `fabric-ai -p pattern1 | fabric-ai -p pattern2`) — this is GUI-side orchestration, two sequential
-  `/chat` calls with a UI step in between.
+      current output into the input box, clears the YouTube field, and focuses pattern search so the user
+      picks a new pattern and Runs — no manual copy/paste. Verified live: `tighten_prompt`'s output correctly
+      fed `improve_prompt` as input. Originally surfaced in `fabric-gui` when "Session" was mistaken for this
+      exact feature. Not something fabric-ai's API does natively (the CLI equivalent is piping,
+      `fabric-ai -p pattern1 | fabric-ai -p pattern2`) — this is GUI-side orchestration, two sequential
+      `/chat` calls with a UI step in between.
   - [ ] **Ambitious version, not built**: a full visual pipeline/wiring builder (drag boxes, connect
-    outputs to inputs, run a whole chain in one click). Revisit if the minimal version proves limiting.
+        outputs to inputs, run a whole chain in one click). Revisit if the minimal version proves limiting.
 - [x] **Pattern variables** — 2026-09-15. Picking a pattern now scans its raw `system.md` for `{{name}}`
-  placeholders (skipping the built-in `{{input}}`) and shows one labeled field per variable, with a snippet
-  of the surrounding prose as a hint. Run is blocked with a specific error until every declared variable is
-  filled in; values flow through to `/chat`'s existing `variables` map and are mirrored in the CLI-command
-  preview as `-v=name:value`. Verified live against `translate` (`{{lang_code}}`) — correctly translated to
-  French. Note: fabric-ai attaches no type/description/allowed-values metadata to variables (confirmed by
-  reading `internal/plugins/template/template.go` — it's a bare `variables[name]` string lookup), so there's
-  no dropdown, just a free-text field per variable — that's the ceiling of what the data supports.
+      placeholders (skipping the built-in `{{input}}`) and shows one labeled field per variable, with a snippet
+      of the surrounding prose as a hint. Run is blocked with a specific error until every declared variable is
+      filled in; values flow through to `/chat`'s existing `variables` map and are mirrored in the CLI-command
+      preview as `-v=name:value`. Verified live against `translate` (`{{lang_code}}`) — correctly translated to
+      French. Note: fabric-ai attaches no type/description/allowed-values metadata to variables (confirmed by
+      reading `internal/plugins/template/template.go` — it's a bare `variables[name]` string lookup), so there's
+      no dropdown, just a free-text field per variable — that's the ceiling of what the data supports.
 - [x] **Prompt preview (client-side dry-run)** — 2026-09-15. fabric-ai's real `--dry-run` fully resolves a
-  pattern (variables + `{{input}}`) and returns the exact request it would have sent, without calling a real
-  model or spending tokens — but it's CLI-only: `internal/server/chat.go`'s `/chat` handler hardcodes
-  `dryRun: false`, so the REST API fabric-ui talks to has no way to request it. Built a client-side
-  equivalent instead: "Preview prompt" (next to Run) fetches the pattern's raw `system.md` and reproduces
-  fsdb's `applyVariables`/`ensureInput` logic locally — substituting filled-in variables and `{{input}}`
-  (auto-appended if the pattern doesn't reference it, matching server behavior), leaving anything unfilled
-  as a visible `{{name}}` placeholder. Shown in a dismissible violet panel labeled "not sent, no tokens
-  used," separate from the real Output panel so it can't be mistaken for a real run. Verified live against
-  `translate`: correctly showed `{{lang_code}}` unresolved before filling it in, then `fr` after.
+      pattern (variables + `{{input}}`) and returns the exact request it would have sent, without calling a real
+      model or spending tokens — but it's CLI-only: `internal/server/chat.go`'s `/chat` handler hardcodes
+      `dryRun: false`, so the REST API fabric-ui talks to has no way to request it. Built a client-side
+      equivalent instead: "Preview prompt" (next to Run) fetches the pattern's raw `system.md` and reproduces
+      fsdb's `applyVariables`/`ensureInput` logic locally — substituting filled-in variables and `{{input}}`
+      (auto-appended if the pattern doesn't reference it, matching server behavior), leaving anything unfilled
+      as a visible `{{name}}` placeholder. Shown in a dismissible violet panel labeled "not sent, no tokens
+      used," separate from the real Output panel so it can't be mistaken for a real run. Verified live against
+      `translate`: correctly showed `{{lang_code}}` unresolved before filling it in, then `fr` after.
   - **Follow-up found 2026-09-15**: `POST /patterns/:name/apply` (`internal/server/patterns.go:106`) is a
     real server-side equivalent of this same resolution. Switching Preview to call it instead of the
     hand-rolled client-side substitution would make it 100% accurate — including surfacing the exact
     "missing variable" error `/chat` would give — for near-zero extra effort. Not done yet.
 - [ ] **Contexts** — `/contexts/*` supports reusable text blocks prepended to any pattern (e.g. a saved
-  Genie Agent's vocabulary, so `improve_genie_question` doesn't have to guess table/column names every
-  time). Not exposed in either the old or new UI yet.
+      Genie Agent's vocabulary, so `improve_genie_question` doesn't have to guess table/column names every
+      time). Not exposed in either the old or new UI yet.
 - [ ] **Session/history browser** — fabric-ai stores session history in a filesystem DB (`fsdb`); nothing
-  surfaces it well anywhere, including the official app's raw "Session Name" text field. Build a
-  searchable history view: past runs, inputs/outputs, diff two outputs, re-run a past session with tweaks.
-  Note: this is about *reading* past sessions, which sidesteps the live multi-turn bug below — a browser
-  doesn't need to *create* new multi-turn exchanges to be useful.
-  - Known limitation if multi-turn *writing* is ever revisited: the 2nd+ message in any session that uses
+      surfaces it well anywhere, including the official app's raw "Session Name" text field. Build a
+      searchable history view: past runs, inputs/outputs, diff two outputs, re-run a past session with tweaks.
+      Note: this is about _reading_ past sessions, which sidesteps the live multi-turn bug below — a browser
+      doesn't need to _create_ new multi-turn exchanges to be useful.
+  - Known limitation if multi-turn _writing_ is ever revisited: the 2nd+ message in any session that uses
     a pattern currently fails against Anthropic (`400 This model does not support assistant message
-    prefill`), reproduced via plain CLI — this is an upstream fabric-ai bug, not something either UI can
+prefill`), reproduced via plain CLI — this is an upstream fabric-ai bug, not something either UI can
     fix. Tracked as [danielmiessler/fabric#2208](https://github.com/danielmiessler/fabric/issues/2208).
 - [ ] **Reasoning/"thinking" level control** — attempted and reverted 2026-09-15; **blocked on an upstream
-  fabric-ai server bug, do not re-attempt without a fabric-ai fix or a real root cause.**
+      fabric-ai server bug, do not re-attempt without a fabric-ai fix or a real root cause.**
   - Why it looked promising: `internal/server/chat.go` passes `request.Thinking` straight into
     `ChatOptions` — genuinely wired into `/chat`, unlike most other CLI-only flags checked in the same
     audit (image gen, TTS, transcription, notifications, max-tokens, suppress-think — all confirmed
@@ -116,46 +116,46 @@ Merged from both source documents; overlapping ideas combined into one item.
     once fabric-ai's server-side bug is understood or fixed — don't rediscover the temperature coupling,
     just re-verify the empty-response bug is actually resolved before re-wiring the dropdown.
   - Not filed upstream yet — should be, with the exact repro above (`-p translate -v=lang_code:fr
-    --thinking low --temperature 1`, CLI succeeds / REST `/chat` with identical params returns empty
+--thinking low --temperature 1`, CLI succeeds / REST `/chat` with identical params returns empty
     response).
 - [ ] **`fabric-ai --serve` behind an API key** — 2026-09-15, found via the same audit. Confirmed in
-  `internal/server/auth.go`: `requireAPIKeyForBind` forces `--api-key` whenever `--serve` binds to
-  anything non-loopback (a real documented setup, e.g. running fabric-ai on a home server), and
-  `APIKeyMiddleware` then 401s every request without a matching `X-API-Key` header. fabric-ui's proxy
-  (`src/routes/api/fabric/[...path]/+server.ts`) has no concept of this — no env var, nothing — so
-  pointing fabric-ui at any non-localhost fabric-ai instance currently fails silently and totally. This is
-  a reliability gap more than a feature request; fix is one env var forwarded as a header in the proxy.
+      `internal/server/auth.go`: `requireAPIKeyForBind` forces `--api-key` whenever `--serve` binds to
+      anything non-loopback (a real documented setup, e.g. running fabric-ai on a home server), and
+      `APIKeyMiddleware` then 401s every request without a matching `X-API-Key` header. fabric-ui's proxy
+      (`src/routes/api/fabric/[...path]/+server.ts`) has no concept of this — no env var, nothing — so
+      pointing fabric-ui at any non-localhost fabric-ai instance currently fails silently and totally. This is
+      a reliability gap more than a feature request; fix is one env var forwarded as a header in the proxy.
 
 ### Medium priority
 
 - [ ] **Vendor/API-key setup panel** — 2026-09-15, found via the same audit. `GET /config` (returns each
-  vendor's key masked to last 4 chars) and `POST /config/update` (writes `.env`, skips resubmitted masked
-  values) already exist server-side and are already built defensively. Today, adding a new model vendor
-  means hand-editing `~/.config/fabric/.env` or running the CLI's interactive `--setup` — a panel showing
-  configured vendors and accepting a new key would remove the last reason to touch a terminal for setup.
+      vendor's key masked to last 4 chars) and `POST /config/update` (writes `.env`, skips resubmitted masked
+      values) already exist server-side and are already built defensively. Today, adding a new model vendor
+      means hand-editing `~/.config/fabric/.env` or running the CLI's interactive `--setup` — a panel showing
+      configured vendors and accepting a new key would remove the last reason to touch a terminal for setup.
 
 - [ ] **Multi-model comparison view** — run the same pattern across 2-3 models (e.g. different Claude
-  tiers, or Ollama if configured) side by side to compare outputs directly.
+      tiers, or Ollama if configured) side by side to compare outputs directly.
 - [ ] **Live pattern editor with test runs** — edit a pattern's `system.md` in the UI and immediately test
-  it against sample input, side by side, without leaving the editor. `/patterns/:name` already supports
-  GET (raw content) and POST (save) server-side.
+      it against sample input, side by side, without leaving the editor. `/patterns/:name` already supports
+      GET (raw content) and POST (save) server-side.
 - [ ] **Smart input handling, remaining pieces** — YouTube URL handling (auto-detect + mutual exclusivity
-  with typed input) is already done. Still open: generic URL scraping (fabric's `-u`/`scrape_url` flag) and
-  drag-and-drop file input, so users don't need to remember which flag maps to which input type.
+      with typed input) is already done. Still open: generic URL scraping (fabric's `-u`/`scrape_url` flag) and
+      drag-and-drop file input, so users don't need to remember which flag maps to which input type.
 - [ ] **Strategies dropdown** — `/strategies` lists reasoning strategies (e.g. chain-of-thought) from
-  `~/.config/fabric/strategies/*.json`. Not exposed anywhere yet.
+      `~/.config/fabric/strategies/*.json`. Not exposed anywhere yet.
 - [x] **Advanced params panel** — 2026-09-16. Collapsible panel under Model with sliders for temperature,
-  top-p, presence penalty, and frequency penalty. Values are only put on the wire when changed from
-  fabric-ai's own CLI defaults (0.7 / 0.9 / 0.0 / 0.0 per `internal/cli/flags.go`), so an untouched panel
-  leaves request bodies byte-identical to before the feature existed; a "modified" badge and a
-  reset-to-defaults button make the non-default state obvious. Non-default values also show up in the
-  CLI-command preview (`-t` / `-T` / `-P` / `-F`). Verified live: temperature 1.4 reached the model,
-  preview correctly rendered `-t 1.4` while omitting the untouched three, and reset restored everything.
+      top-p, presence penalty, and frequency penalty. Values are only put on the wire when changed from
+      fabric-ai's own CLI defaults (0.7 / 0.9 / 0.0 / 0.0 per `internal/cli/flags.go`), so an untouched panel
+      leaves request bodies byte-identical to before the feature existed; a "modified" badge and a
+      reset-to-defaults button make the non-default state obvious. Non-default values also show up in the
+      CLI-command preview (`-t` / `-T` / `-P` / `-F`). Verified live: temperature 1.4 reached the model,
+      preview correctly rendered `-t 1.4` while omitting the untouched three, and reset restored everything.
   - Vendor support is uneven, and the panel says so inline rather than pretending otherwise — confirmed by
     reading each plugin: **Anthropic** treats Temperature and TopP as mutually exclusive (a non-default
     TopP makes `anthropic.go` send TopP and drop Temperature entirely) and never references either
     penalty; **Gemini** applies Temperature/TopP but ignores the penalties too; **OpenAI** is the only
-    vendor where all four do something. Crucially, none of them *reject* these values — unlike the
+    vendor where all four do something. Crucially, none of them _reject_ these values — unlike the
     thinking control's hard 400 — so this was safe to ship where that wasn't.
   - Corrected 2026-09-15: this bullet previously also listed `seed`, but the full-surface audit confirmed
     `chat.go`'s handler only copies 9 specific fields from the request into `ChatOptions`
@@ -169,8 +169,8 @@ Merged from both source documents; overlapping ideas combined into one item.
 ### Lower priority / exploratory
 
 - [ ] **Custom pattern builder** — a form-based UI for authoring brand-new patterns (not just running or
-  editing existing ones), including variable/placeholder definition, without hand-editing markdown files.
-  Broader than the live pattern editor above — that one edits; this one creates from scratch.
+      editing existing ones), including variable/placeholder definition, without hand-editing markdown files.
+      Broader than the live pattern editor above — that one edits; this one creates from scratch.
 
 ## Shipped
 
@@ -204,5 +204,5 @@ tracked here as design/functionality wins, not code to copy.
 - SvelteKit + TypeScript + Tailwind 4 + mdsvex scaffold, git-initialized — 2026-09-14
 - Server-side proxy (`/api/fabric/[...path]`) replacing the standalone Python proxy — 2026-09-14
 - Full pattern-runner page ported and verified end-to-end against live `fabric-ai --serve`: pattern search
-  + descriptions, model selection, web search toggle, YouTube/input mutual exclusivity, streaming output,
-  token usage, CLI-command preview — 2026-09-14
+  - descriptions, model selection, web search toggle, YouTube/input mutual exclusivity, streaming output,
+    token usage, CLI-command preview — 2026-09-14
