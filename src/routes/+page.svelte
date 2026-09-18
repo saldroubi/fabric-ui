@@ -258,6 +258,7 @@
 	}
 
 	async function deleteContextByName(name: string) {
+		if (!confirm(`Delete the "${name}" context? This can't be undone.`)) return;
 		contextStatus = '';
 		try {
 			await deleteContext(name);
