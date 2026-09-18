@@ -37,6 +37,7 @@ export interface ChatRunOptions {
 	model?: string;
 	search?: boolean;
 	variables?: Record<string, string>;
+	contextName?: string;
 	thinking?: string;
 	temperature?: number;
 	topP?: number;
@@ -98,6 +99,59 @@ export async function fetchYoutubeTranscript(url: string): Promise<YoutubeTransc
 	const data = await res.json();
 	if (!res.ok) throw new Error(data.error ?? `Failed to fetch transcript (${res.status})`);
 	return data;
+}
+
+// Contexts (`/contexts/*`): reusable blocks of background text, saved once
+// and optionally prepended ahead of any pattern's own system message — e.g.
+// a Genie agent's table/column vocabulary, so patterns don't need it
+// retyped into the input every run. fabric-ai's storage layer (fsdb) has no
+// concept of "content-type" for these, it just reads/writes raw bytes, so
+// requests use text/plain rather than JSON.
+
+export async function fetchContextNames(): Promise<string[]> {
+	const res = await fetch('/api/fabric/contexts/names');
+	if (!res.ok) throw new Error(`Failed to load contexts (${res.status})`);
+	const names: string[] = await res.json();
+	return [...names].sort();
+}
+
+export async function fetchContextContent(name: string): Promise<string> {
+	const res = await fetch(`/api/fabric/contexts/${encodeURIComponent(name)}`);
+	const data = await res.json();
+	if (!res.ok) throw new Error(data.error ?? `Failed to load context "${name}" (${res.status})`);
+	return data.Content ?? '';
+}
+
+export async function saveContext(name: string, content: string): Promise<void> {
+	const res = await fetch(`/api/fabric/contexts/${encodeURIComponent(name)}`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'text/plain' },
+		body: content
+	});
+	if (!res.ok) {
+		const data = await res.json().catch(() => ({}));
+		throw new Error(data.error ?? `Failed to save context "${name}" (${res.status})`);
+	}
+}
+
+export async function deleteContext(name: string): Promise<void> {
+	const res = await fetch(`/api/fabric/contexts/${encodeURIComponent(name)}`, { method: 'DELETE' });
+	if (!res.ok) {
+		const data = await res.json().catch(() => ({}));
+		throw new Error(data.error ?? `Failed to delete context "${name}" (${res.status})`);
+	}
+}
+
+// Mirrors internal/core/chatter.go's joinPromptSections exactly: trim each
+// section, drop empty ones, join what's left with a single newline. The
+// real /chat handler builds its system message this way — context first,
+// then the pattern's (already variable/input-resolved) content — so the
+// client-side prompt preview needs the identical join to stay byte-accurate.
+export function joinPromptSections(...parts: string[]): string {
+	return parts
+		.map((p) => p.trim())
+		.filter((p) => p.length > 0)
+		.join('\n');
 }
 
 // Every fabric pattern's system.md starts with an "# IDENTITY [and PURPOSE]"
@@ -253,7 +307,8 @@ export async function* runChat(opts: ChatRunOptions): AsyncGenerator<StreamEvent
 					patternName: opts.pattern,
 					vendor: '',
 					model: opts.model ?? '',
-					variables: opts.variables ?? {}
+					variables: opts.variables ?? {},
+					contextName: opts.contextName ?? ''
 				}
 			],
 			language: 'en',
@@ -307,6 +362,7 @@ export function buildCliCommand(opts: {
 	youtubeUrl?: string;
 	webSearch?: boolean;
 	variables?: Record<string, string>;
+	contextName?: string;
 	thinking?: string;
 	temperature?: number;
 	topP?: number;
@@ -316,6 +372,7 @@ export function buildCliCommand(opts: {
 	let cmd = 'fabric-ai';
 	if (opts.youtubeUrl) cmd += ` -y ${shellQuote(opts.youtubeUrl)}`;
 	cmd += ` -p ${opts.pattern || '<pattern>'}`;
+	if (opts.contextName) cmd += ` -C ${opts.contextName}`;
 	if (opts.model) cmd += ` -m ${opts.model}`;
 	if (opts.webSearch) cmd += ` --search`;
 	if (opts.thinking && opts.thinking !== 'off') {

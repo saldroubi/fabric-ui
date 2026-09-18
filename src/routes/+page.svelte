@@ -5,11 +5,16 @@
 		fetchModels,
 		fetchGuiConfig,
 		fetchYoutubeTranscript,
+		fetchContextNames,
+		fetchContextContent,
+		saveContext,
+		deleteContext,
 		getPatternDescription,
 		getPatternVariables,
 		getPatternRawContent,
 		resolvePromptPreview,
 		applyPatternOnServer,
+		joinPromptSections,
 		runChat,
 		buildCliCommand,
 		type UsageMetadata,
@@ -49,6 +54,18 @@
 	let models = $state<string[]>([]);
 	let selectedModel = $state('');
 	let defaultModelLabel = $state('(default)');
+
+	// Contexts: reusable background text, optionally prepended ahead of
+	// whichever pattern is run (see the comment on joinPromptSections in
+	// $lib/fabric for exactly how). Independent of pattern choice, so the
+	// selection persists across pattern switches like Model does.
+	let allContexts = $state<string[]>([]);
+	let selectedContextName = $state('');
+	let contextManagerOpen = $state(false);
+	let contextEditorName = $state('');
+	let contextEditorContent = $state('');
+	let contextSaving = $state(false);
+	let contextStatus = $state('');
 
 	// Advanced sampling params. These mirror fabric-ai's own CLI defaults
 	// (internal/cli/flags.go) so the panel shows what's actually in effect;
@@ -168,6 +185,7 @@
 		loadPatterns();
 		loadModels();
 		loadDefaultLabel();
+		loadContexts();
 	});
 
 	async function loadPatterns() {
@@ -192,6 +210,64 @@
 	async function loadDefaultLabel() {
 		const config = await fetchGuiConfig();
 		if (config.defaultModel) defaultModelLabel = `(default — ${config.defaultModel})`;
+	}
+
+	async function loadContexts() {
+		try {
+			allContexts = await fetchContextNames();
+		} catch {
+			// non-fatal; context stays optional, select just shows "(none)"
+		}
+	}
+
+	function newContext() {
+		contextEditorName = '';
+		contextEditorContent = '';
+		contextStatus = '';
+	}
+
+	async function editContext(name: string) {
+		contextEditorName = name;
+		contextStatus = 'Loading…';
+		try {
+			contextEditorContent = await fetchContextContent(name);
+			contextStatus = '';
+		} catch (e) {
+			contextStatus = `Failed to load: ${e}`;
+		}
+	}
+
+	async function saveContextEditor() {
+		const name = contextEditorName.trim();
+		if (!name) {
+			contextStatus = 'Name the context first.';
+			return;
+		}
+		contextSaving = true;
+		contextStatus = '';
+		try {
+			await saveContext(name, contextEditorContent);
+			if (!allContexts.includes(name)) allContexts = [...allContexts, name].sort();
+			selectedContextName = name;
+			contextStatus = 'Saved.';
+		} catch (e) {
+			contextStatus = `Failed to save: ${e}`;
+		} finally {
+			contextSaving = false;
+		}
+	}
+
+	async function deleteContextByName(name: string) {
+		contextStatus = '';
+		try {
+			await deleteContext(name);
+			allContexts = allContexts.filter((n) => n !== name);
+			if (selectedContextName === name) selectedContextName = '';
+			if (contextEditorName === name) newContext();
+			contextStatus = 'Deleted.';
+		} catch (e) {
+			contextStatus = `Failed to delete: ${e}`;
+		}
 	}
 
 	async function selectPattern(name: string) {
@@ -290,17 +366,26 @@
 		const allVariablesFilled = patternVariables.every((v) => variables[v.name]);
 
 		try {
+			let resolvedPattern: string;
 			if (allVariablesFilled) {
 				// Every variable is filled, so the real endpoint can resolve this
 				// exactly like /chat would — more accurate than the client-side
 				// approximation below, which stays as the fallback for previewing
 				// with some variables still blank (the server's error path for
 				// that case collapses to a generic 500, not something to show).
-				promptPreview = await applyPatternOnServer(pattern, variables, effectiveInput);
+				resolvedPattern = await applyPatternOnServer(pattern, variables, effectiveInput);
 			} else {
 				const content = await getPatternRawContent(pattern);
-				promptPreview = resolvePromptPreview(content, variables, effectiveInput);
+				resolvedPattern = resolvePromptPreview(content, variables, effectiveInput);
 			}
+			// /patterns/:name/apply has no concept of context (confirmed by
+			// reading internal/server/patterns.go — ApplyPattern never touches
+			// fsdb.Contexts), so context is joined in client-side either way,
+			// the same way /chat's real handler joins them server-side.
+			const contextContent = selectedContextName
+				? await fetchContextContent(selectedContextName)
+				: '';
+			promptPreview = joinPromptSections(contextContent, resolvedPattern);
 			previewOpen = true;
 			setStatus('');
 		} catch (e) {
@@ -360,6 +445,7 @@
 			youtubeUrl: hasYoutube ? youtubeUrl.trim() : undefined,
 			webSearch,
 			variables,
+			contextName: selectedContextName || undefined,
 			...activeParams
 		});
 
@@ -370,6 +456,7 @@
 				model: selectedModel,
 				search: webSearch,
 				variables,
+				contextName: selectedContextName || undefined,
 				...activeParams
 			})) {
 				if (evt.type === 'content') {
@@ -589,6 +676,18 @@
 						{/each}
 					</select>
 				</div>
+				<div class="min-w-[180px] flex-1">
+					<label for="context" class={labelClass}>
+						Context
+						<span class="font-normal text-zinc-400 dark:text-zinc-600">· optional</span>
+					</label>
+					<select id="context" bind:value={selectedContextName} class="cursor-pointer {fieldClass}">
+						<option value="">(none)</option>
+						{#each allContexts as name (name)}
+							<option value={name}>{name}</option>
+						{/each}
+					</select>
+				</div>
 				{#each patternVariables as v (v.name)}
 					<div class="min-w-[180px] flex-1">
 						<label for={`var-${v.name}`} class={labelClass}>
@@ -741,6 +840,109 @@
 				{/if}
 			</div>
 
+			<!-- manage contexts -->
+			<div class="mt-3">
+				<button
+					type="button"
+					onclick={() => (contextManagerOpen = !contextManagerOpen)}
+					class="flex items-center gap-1.5 text-[0.85rem] font-medium text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						class="h-3.5 w-3.5 transition-transform {contextManagerOpen ? 'rotate-90' : ''}"
+					>
+						<path d="m9 6 6 6-6 6" />
+					</svg>
+					Manage contexts
+				</button>
+
+				{#if contextManagerOpen}
+					<div
+						class="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-[#232327] dark:bg-white/[0.02]"
+					>
+						<p class="mb-4 text-[0.78rem] leading-relaxed text-zinc-500 dark:text-zinc-500">
+							Reusable background text, saved once and optionally prepended before whichever pattern
+							you run — e.g. a schema's table/column vocabulary a pattern shouldn't have to guess at
+							every time.
+						</p>
+
+						{#if allContexts.length > 0}
+							<div class="mb-4 flex flex-wrap gap-1.5">
+								{#each allContexts as name (name)}
+									<span
+										class="inline-flex items-center gap-1 rounded-full border border-zinc-300 py-1 pr-1 pl-2.5 text-[0.75rem] dark:border-[#2e2e34]"
+									>
+										<button
+											type="button"
+											onclick={() => editContext(name)}
+											class="font-medium hover:underline"
+										>
+											{name}
+										</button>
+										<button
+											type="button"
+											onclick={() => deleteContextByName(name)}
+											aria-label={`Delete ${name}`}
+											title={`Delete ${name}`}
+											class="rounded-full px-1.5 text-zinc-400 transition hover:bg-red-500/10 hover:text-red-500"
+										>
+											×
+										</button>
+									</span>
+								{/each}
+							</div>
+						{:else}
+							<p class="mb-4 text-[0.78rem] text-zinc-500 dark:text-zinc-500">
+								No saved contexts yet.
+							</p>
+						{/if}
+
+						<div>
+							<label for="contextName" class={labelClass}>Name</label>
+							<input
+								id="contextName"
+								placeholder="e.g. genie-sales-schema"
+								bind:value={contextEditorName}
+								class={fieldClass}
+							/>
+						</div>
+						<div class="mt-3">
+							<label for="contextContent" class={labelClass}>Content</label>
+							<textarea
+								id="contextContent"
+								placeholder="Background text prepended before the pattern's own instructions…"
+								bind:value={contextEditorContent}
+								class="min-h-[100px] resize-y leading-relaxed {fieldClass}"></textarea>
+						</div>
+						<div class="mt-3 flex items-center gap-2">
+							<button
+								type="button"
+								onclick={saveContextEditor}
+								disabled={contextSaving}
+								class="rounded-md bg-emerald-600 px-3 py-1.5 text-[0.78rem] font-semibold text-white transition hover:brightness-110 disabled:cursor-default disabled:opacity-50"
+							>
+								{contextSaving ? 'Saving…' : 'Save'}
+							</button>
+							<button
+								type="button"
+								onclick={newContext}
+								class="rounded-md border border-zinc-300 px-3 py-1.5 text-[0.78rem] font-semibold text-zinc-600 transition hover:bg-zinc-900/[0.04] dark:border-[#2e2e34] dark:text-zinc-400 dark:hover:bg-white/[0.05]"
+							>
+								New
+							</button>
+							{#if contextStatus}
+								<span class="text-[0.78rem] text-zinc-500 dark:text-zinc-500">{contextStatus}</span>
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+
 			<div class={ruleClass}></div>
 
 			<!-- input -->
@@ -848,6 +1050,10 @@
 					</div>
 					<p class="mb-2.5 text-[0.78rem] text-zinc-500 dark:text-zinc-500">
 						Exactly what would be sent as the system message. Nothing was sent — no tokens used.
+						{#if selectedContextName}
+							Includes the "<span class="font-mono">{selectedContextName}</span>" context,
+							prepended.
+						{/if}
 					</p>
 					<div
 						class="max-h-80 overflow-y-auto rounded-lg border border-l-2 border-zinc-200 border-l-violet-500 bg-zinc-50 p-3.5 font-mono text-[0.82rem] leading-relaxed whitespace-pre-wrap dark:border-[#232327] dark:border-l-violet-400 dark:bg-[#0a0a0c]"

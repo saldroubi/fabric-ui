@@ -31,6 +31,10 @@ architected, and adds the larger ones `fabric-gui` never attempted.
 - **Tech stack confirmed and executed**: SvelteKit 5 (runes mode), TypeScript, Tailwind 4, mdsvex. Skeleton
   UI (fabric's own component library) not yet added — revisit if/when a component need justifies the
   dependency.
+- **Dropped: vendor/API-key setup panel.** 2026-09-18. `fabric-ai --setup` (interactive CLI) already
+  covers this, and anyone running `fabric-ai --serve` directly is already comfortable in a terminal — the
+  panel would have solved a problem this project's users don't actually have. `GET /config` /
+  `POST /config/update` remain unused server-side capabilities if this is ever reconsidered.
 - **CORS/proxy solved via SvelteKit server routes** instead of a separate Python process: fabric-ai's REST
   API only sets `Access-Control-Allow-Origin` on `/chat` (hardcoded to `localhost:5173` — coincidentally
   fabric's own official app's default Vite port), and zero CORS headers on every other endpoint
@@ -74,9 +78,6 @@ Merged from both source documents; overlapping ideas combined into one item.
     real server-side equivalent of this same resolution. Switching Preview to call it instead of the
     hand-rolled client-side substitution would make it 100% accurate — including surfacing the exact
     "missing variable" error `/chat` would give — for near-zero extra effort. Not done yet.
-- [ ] **Contexts** — `/contexts/*` supports reusable text blocks prepended to any pattern (e.g. a saved
-      Genie Agent's vocabulary, so `improve_genie_question` doesn't have to guess table/column names every
-      time). Not exposed in either the old or new UI yet.
 - [ ] **Session/history browser** — fabric-ai stores session history in a filesystem DB (`fsdb`); nothing
       surfaces it well anywhere, including the official app's raw "Session Name" text field. Build a
       searchable history view: past runs, inputs/outputs, diff two outputs, re-run a past session with tweaks.
@@ -127,12 +128,6 @@ prefill`), reproduced via plain CLI — this is an upstream fabric-ai bug, not s
       a reliability gap more than a feature request; fix is one env var forwarded as a header in the proxy.
 
 ### Medium priority
-
-- [ ] **Vendor/API-key setup panel** — 2026-09-15, found via the same audit. `GET /config` (returns each
-      vendor's key masked to last 4 chars) and `POST /config/update` (writes `.env`, skips resubmitted masked
-      values) already exist server-side and are already built defensively. Today, adding a new model vendor
-      means hand-editing `~/.config/fabric/.env` or running the CLI's interactive `--setup` — a panel showing
-      configured vendors and accepting a new key would remove the last reason to touch a terminal for setup.
 
 - [ ] **Multi-model comparison view** — run the same pattern across 2-3 models (e.g. different Claude
       tiers, or Ollama if configured) side by side to compare outputs directly.
@@ -206,3 +201,16 @@ tracked here as design/functionality wins, not code to copy.
 - Full pattern-runner page ported and verified end-to-end against live `fabric-ai --serve`: pattern search
   - descriptions, model selection, web search toggle, YouTube/input mutual exclusivity, streaming output,
     token usage, CLI-command preview — 2026-09-14
+- **Contexts** — 2026-09-18. A "Context" select next to Model (persists across pattern switches, like Model
+  does) plus a collapsible "Manage contexts" panel for full CRUD (create/edit/save/delete), all against
+  fabric-ai's existing `/contexts/*` endpoints (`internal/server/contexts.go`, a generic `StorageHandler`
+  identical in shape to patterns'). `/chat`'s `contextName` field (`internal/server/chat.go:28`) is wired
+  through `runChat`; `buildCliCommand` emits `-C <name>` (the real CLI flag, `internal/cli/flags.go:31`).
+  Prompt preview joins context + resolved pattern content client-side via a new `joinPromptSections` helper
+  that mirrors `internal/core/chatter.go`'s function of the same name byte-for-byte (trim each part, drop
+  empty ones, join with `\n`) — needed because `/patterns/:name/apply` (used for the accurate preview path)
+  has no context concept, confirmed by reading `internal/server/patterns.go`'s `ApplyPattern`. Verified live:
+  saved a context with fake `sales_orders`/`deal_size` definitions, selected it against `summarize`, Preview
+  showed it correctly prepended ahead of `# IDENTITY and PURPOSE`, and a real run's output cited the context's
+  exact "not first-year value" wording plus `-C test-fabric-ui-context` in the CLI-command preview — then
+  deleted the test context via the UI and confirmed `GET /contexts/names` came back empty.
