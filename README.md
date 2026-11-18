@@ -4,6 +4,10 @@ A local web interface for [fabric-ai](https://github.com/danielmiessler/fabric) 
 
 **Not affiliated with or endorsed by the fabric project.** Personal project.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="Fabric UI: pick a pattern, see its description, choose a model, and run it" width="560">
+</p>
+
 ## Why this exists
 
 fabric's own official web app (`web/` in its repo) ships with a plain `<select>` listing all 260+ patterns alphabetically — no search, no descriptions, so picking the right one means already knowing its exact name. This project exists to fix that, plus add a few things fabric's REST API supports but no UI (including the official one) surfaces:
